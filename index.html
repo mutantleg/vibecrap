@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- 
+written by claude.ai (Sonnet 4.5)
+
+prompt:
+can you write a tiny space invaders game in javascript
+where all the invaders and your ship is drawn with ascii text 
+onto a canvas?
+if your ship is get shot just restart the game
+if you shoot down all invaders just write "you are winner"
+in the middle of the screen and stop the game
+
+
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Space Invaders</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #000;
+            font-family: monospace;
+        }
+        canvas {
+            border: 2px solid #0f0;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game"></canvas>
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 600;
+        canvas.height = 400;
+
+        let player = { x: 280, y: 360, width: 40, height: 20 };
+        let invaders = [];
+        let bullets = [];
+        let enemyBullets = [];
+        let invaderDir = 1;
+        let invaderSpeed = 0.5;
+        let gameOver = false;
+        let won = false;
+
+        const keys = {};
+
+        // Initialize invaders
+        function initInvaders() {
+            invaders = [];
+            for (let row = 0; row < 4; row++) {
+                for (let col = 0; col < 8; col++) {
+                    invaders.push({
+                        x: col * 60 + 50,
+                        y: row * 40 + 40,
+                        width: 40,
+                        height: 20,
+                        alive: true
+                    });
+                }
+            }
+        }
+
+        function drawText(text, x, y, size = 16) {
+            ctx.fillStyle = '#0f0';
+            ctx.font = `${size}px monospace`;
+            ctx.fillText(text, x, y);
+        }
+
+        function drawPlayer() {
+            drawText(' /^\\ ', player.x, player.y + 15);
+            drawText('/___\\', player.x, player.y + 25);
+        }
+
+        function drawInvader(inv) {
+            drawText('/o.o\\', inv.x, inv.y + 10);
+            drawText('(_|_)', inv.x, inv.y + 20);
+        }
+
+        function drawBullet(b) {
+            drawText('|', b.x, b.y);
+        }
+
+        function update() {
+            if (gameOver || won) return;
+
+            // Move player
+            if (keys['ArrowLeft'] && player.x > 0) player.x -= 3;
+            if (keys['ArrowRight'] && player.x < canvas.width - 40) player.x += 3;
+
+            // Move invaders
+            let moveDown = false;
+            for (let inv of invaders) {
+                if (!inv.alive) continue;
+                inv.x += invaderDir * invaderSpeed;
+                if (inv.x <= 0 || inv.x >= canvas.width - 40) {
+                    moveDown = true;
+                }
+            }
+
+            if (moveDown) {
+                invaderDir *= -1;
+                for (let inv of invaders) {
+                    inv.y += 20;
+                }
+            }
+
+            // Random enemy shooting
+            if (Math.random() < 0.01) {
+                let aliveInvaders = invaders.filter(i => i.alive);
+                if (aliveInvaders.length > 0) {
+                    let shooter = aliveInvaders[Math.floor(Math.random() * aliveInvaders.length)];
+                    enemyBullets.push({ x: shooter.x + 20, y: shooter.y + 20 });
+                }
+            }
+
+            // Move bullets
+            bullets = bullets.filter(b => {
+                b.y -= 5;
+                return b.y > 0;
+            });
+
+            enemyBullets = enemyBullets.filter(b => {
+                b.y += 3;
+                return b.y < canvas.height;
+            });
+
+            // Check bullet collisions with invaders
+            for (let b of bullets) {
+                for (let inv of invaders) {
+                    if (inv.alive && 
+                        b.x > inv.x && b.x < inv.x + inv.width &&
+                        b.y > inv.y && b.y < inv.y + inv.height) {
+                        inv.alive = false;
+                        b.y = -100;
+                    }
+                }
+            }
+
+            // Check enemy bullet collision with player
+            for (let b of enemyBullets) {
+                if (b.x > player.x && b.x < player.x + player.width &&
+                    b.y > player.y && b.y < player.y + player.height) {
+                    gameOver = true;
+                    setTimeout(reset, 1000);
+                }
+            }
+
+            // Check win condition
+            if (invaders.every(i => !i.alive)) {
+                won = true;
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (won) {
+                ctx.fillStyle = '#0f0';
+                ctx.font = '48px monospace';
+                ctx.fillText('YOU ARE WINNER', 100, canvas.height / 2);
+                return;
+            }
+
+            drawPlayer();
+
+            for (let inv of invaders) {
+                if (inv.alive) drawInvader(inv);
+            }
+
+            for (let b of bullets) drawBullet(b);
+            for (let b of enemyBullets) drawBullet(b);
+        }
+
+        function reset() {
+            player.x = 280;
+            bullets = [];
+            enemyBullets = [];
+            gameOver = false;
+            won = false;
+            invaderDir = 1;
+            initInvaders();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ' && !gameOver && !won) {
+                bullets.push({ x: player.x + 20, y: player.y });
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        initInvaders();
+        gameLoop();
+    </script>
+</body>
+</html>
